@@ -20,9 +20,9 @@ library(terra)
 library(sf)
 
 # read raster layers 
-grass.rast <- rast("/Users/gustafgranath/Projects/damchange/GRAC_1518_020m_E47N40_03035_v010.tif")
-forest.rast <- rast("/Users/gustafgranath/Projects/damchange/TCCM_1518_020m_E47N40_03035_v010.tif")
-imp.rast <- rast("/Users/gustafgranath/Projects/damchange/IMCC_1518_020m_E47N40_03035_v010.tif")
+grass.rast <- rast("GRAC_1518_020m_E47N40_03035_v010.tif")
+forest.rast <- rast("TCCM_1518_020m_E47N40_03035_v010.tif")
+imp.rast <- rast("IMCC_1518_020m_E47N40_03035_v010.tif")
 
 # load pond locations and transform to same projection
 url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=1833472143'
@@ -522,9 +522,8 @@ sp.mat.dat.14 <- sp.mat.dat.14[,-c(rare)]
 sp.mat.dat.19 <- sp.mat.dat.19[, -c(rare)]
 
 sp.names = colnames(sp.mat.dat.14)
-res =as.data.frame(matrix(nrow=length(sp.names),ncol=14))
+res =as.data.frame(matrix(nrow=length(sp.names),ncol=9))
 colnames(res) <- c("names","ps", "odd", "col.ebcom", "ext.ebcom",
-                "ps1", "ps2", "odd.zip", "col.zipebcom", "ext.zipebcom",
                 "00","10","01","11") # row-column
 
 for (i in 1:length(sp.names)) {
@@ -532,21 +531,13 @@ for (i in 1:length(sp.names)) {
   ebcom = vglm(cbind(sp.mat.dat.14[,spname], sp.mat.dat.19[,spname]) ~ 1,
                     family=binom2.or(lmu="clogloglink", exchangeable=T),
                     trace=TRUE)
-  zipebcom.mod = vglm(cbind(sp.mat.dat.14[,spname], sp.mat.dat.19[,spname])~ 1,
-                  crit="l", fam=zipebcom, trace=TRUE)
-
+  
   ps=clogloglink(coef(ebcom, mat=T)[1,"clogloglink(mu1)"],
                  inv=TRUE)
-  ps1=clogloglink(coef(zipebcom.mod, mat=T)[1,"clogloglink(mu12)"],
-                  inv=TRUE)
-  ps2=logitlink(coef(zipebcom.mod, mat=T)[1,"logitlink(phi12)"],
-                inv=TRUE)
-  
+
   odd = loglink(coef(ebcom, mat=T)[1,"loglink(oratio)"],
               inv=TRUE)
-  odd.zip =loglink(coef(zipebcom.mod, mat=T)[1,"loglink(oratio)"],
-               inv=TRUE)
-  
+
   #colonization prob, Equ 13 in the 2009 paper
   col.ebcom = probColonization(ps, odd)
     #(sqrt( 1+4*(odd-1)*ps*(1-ps))-1) / (2*(odd-1)*(1-ps))
@@ -554,13 +545,10 @@ for (i in 1:length(sp.names)) {
   #extinction prob, Equ 14 in the 2009 paper
   ext.ebcom = probExtinction(ps, odd)
     #(sqrt( 1+4*(odd-1)*ps*(1-ps))-1) / (2*(odd-1)*ps)
-  
-  col.zip = probColon(ps1,ps2, odd.zip)
-  ext.zip = probExtin(ps1,ps2, odd.zip)
+
   
   res[i,1] <- spname
-  res[i,2:14] <-  c(round(c(ps, odd, col.ebcom, ext.ebcom,
-                ps1, ps2, odd.zip, col.zip, ext.zip
+  res[i,2:9] <-  c(round(c(ps, odd, col.ebcom, ext.ebcom
                 ),2),
   c(table(factor(sp.mat.dat.14[,spname], levels = 0:1), 
           factor(sp.mat.dat.19[,spname], levels = 0:1) )))#/ nrow(sp.mat.dat.19) 
@@ -568,13 +556,6 @@ for (i in 1:length(sp.names)) {
 
 }
 res
-
-# The estimated probability that a site has the species present 
-(1-res$ps2)*res$ps1
-
-# simple plots
-plot(res$col.ebcom, res$col.zipebcom)
-plot(res$ext.ebcom, res$ext.zipebcom)
 
 # Check species
 res[which(res$ext.ebcom==1),]
@@ -612,22 +593,6 @@ ext = ggplot(res, aes(x=ps, y=ext.ebcom, color=names))+
 
 plot_grid(colo, ext, ncol=2,labels=c("A", "B"))
 
-
-
-ggplot(res, aes(x=ps1, y=col.zipebcom, color=names))+
-  geom_point() +
-  geom_abline(slope=-1, intercept=1)+
-  scale_x_continuous(expand = c(0, 0), limits = c(0,1),
-                     breaks=seq(0,1,0.1)) + 
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 1.1),
-                     breaks=seq(0,1,0.1))
-ggplot(res, aes(x=ps1, y=ext.zipebcom, color=names))+
-  geom_point() +
-  geom_abline(slope=1)+
-  scale_x_continuous(expand = c(0, 0), limits = c(0,1),
-                     breaks=seq(0,1,0.1)) + 
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 1.1),
-                     breaks=seq(0,1,0.1))
 
 #___Functions for colonization-extinction calculations####
 probColonization = function(prob, oratio=1) {
