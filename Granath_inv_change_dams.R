@@ -102,9 +102,9 @@ sp19$Lestes.sp. <- Lestes.sp.
 lestes.remove <- which(colnames(sp14) %in% c("Lestes.dryas", "Lestes.sponsa"))
 sp14 <- sp14[,-lestes.remove]
 sp19 <- sp19[,-lestes.remove]
-
 sp14 <- sp14[-NArows,]
 sp19 <- sp19[-NArows,]
+
 no.species <- which(colSums(rbind(sp14[,-1],sp19[,-1]))==0)
 sp14 <- sp14[,-(no.species+1)] # +1 to add first column with pond names
 sp19 <- sp19[,-(no.species+1)] # +1 to add first column with pond names
@@ -506,10 +506,13 @@ mod_time <- manyglm(abu ~ factor(time),
 anova(mod_time, test = "score", bootID = permID,cor.type = "shrink")
 
 #___specific species change####
-summary.manyglm(mod_time, cor.type = "shrink", test = "score",
+sum.unad = summary.manyglm(mod_time, cor.type = "shrink", test = "score",
                 bootID = permID,p.uni = "unadjusted")
-summary.manyglm(mod_time, cor.type = "shrink", test = "score",
+rownames(sum.unad$uni.p)[which(sum.unad$uni.p[,2]<0.05)]
+
+sum.ad = summary.manyglm(mod_time, cor.type = "shrink", test = "score",
                 bootID = permID,p.uni = "adjusted")
+rownames(sum.ad$uni.p)[which(sum.ad$uni.p[,2]<0.05)]
 
 #Species colon-extinc prob####
 #__VGAM####
