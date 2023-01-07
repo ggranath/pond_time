@@ -259,13 +259,19 @@ beta2014 <- beta.multi(sp14[,-1], index.family="jaccard")
 
 # spatial beta diversity
 jac.2014 <- beta.pair(sp14[,-1], index.family="jac")
+# make matrix where each column has all pairs (remove diagonal)
 jac.2014.turn <- as.matrix(jac.2014$beta.jtu)
 jac.2014.nest <- as.matrix(jac.2014$beta.jne)
 jac.2014.tot <- as.matrix(jac.2014$beta.jac)
+diag(jac.2014.turn) <- NA
+diag(jac.2014.nest) <- NA
+diag(jac.2014.tot) <- NA
+
 # turnover
 dis.site.turn =vector()
 for (i in 1:NCOL(jac.2014.turn)) {
-  dis.site.turn[i] <- mean(c(jac.2014.turn[i,], jac.2014.turn[,i]), na.rm=TRUE)
+  #dis.site.turn[i] <- mean(c(jac.2014.turn[i,], jac.2014.turn[,i]), na.rm=TRUE)
+  dis.site.turn[i] <- mean(jac.2014.turn[,i], na.rm=TRUE)
 }
 mean(dis.site.turn);sd(dis.site.turn)
 mean(beta.temp[,1]);sd(beta.temp[,1])
@@ -274,7 +280,8 @@ t.test(beta.temp[,1], dis.site.turn)
 # nested
 dis.site.nest =vector()
 for (i in 1:NCOL(jac.2014.nest)) {
-  dis.site.nest[i] <- mean(c(jac.2014.nest[i,], jac.2014.nest[,i]), na.rm=TRUE)
+  #dis.site.nest[i] <- mean(c(jac.2014.nest[i,], jac.2014.nest[,i]), na.rm=TRUE)
+  dis.site.nest[i] <- mean(jac.2014.nest[,i], na.rm=TRUE)
 }
 mean(dis.site.nest);sd(dis.site.nest)
 mean(beta.temp[,2]);sd(beta.temp[,2])
@@ -283,18 +290,82 @@ t.test(beta.temp[,2], dis.site.nest)
 # total
 dis.site.tot =vector()
 for (i in 1:NCOL(jac.2014.tot)) {
-  dis.site.tot[i] <- mean(c(jac.2014.tot[i,], jac.2014.tot[,i]), na.rm=TRUE)
+  #dis.site.tot[i] <- mean(c(jac.2014.tot[i,], jac.2014.tot[,i]), na.rm=TRUE)
+  dis.site.tot[i] <- mean(jac.2014.tot[,i], na.rm=TRUE)
 }
 mean(dis.site.tot);sd(dis.site.tot)
 mean(beta.temp[,3]);sd(beta.temp[,3])
 
 t.test(beta.temp[,3], dis.site.tot)
 
-#___Fig 4 to compare spatial-temporal beta diversity####
-spa.temp <- data.frame(turnover = c(dis.site.turn,beta.temp[,1]),
-           nestedness = c(dis.site.nest,beta.temp[,2]),
-           total = c(dis.site.tot,beta.temp[,3]),
-           Type = rep(c("spatial", "temporal"), each = 30))
+#____Test for replacement and loss/gain####
+library(BAT)
+# Spatial
+beta.spat.rep14 <- beta(sp14[,-1], func = "jaccard", abund = FALSE)
+beta.spat.rep19 <- beta(sp19[,-1], func = "jaccard", abund = FALSE)
+
+# year the same here as well, so go with 2014
+mean(beta.spat.rep14$Btotal)
+mean(beta.spat.rep19$Btotal)
+mean(beta.spat.rep14$Brich)
+mean(beta.spat.rep19$Brich)
+mean(beta.spat.rep14$Brepl)
+mean(beta.spat.rep19$Brepl)
+
+mean(jac.2014.tot)
+mean(jac.2014.nest)
+mean(jac.2014.turn)
+
+beta.spat.rep.Btotal <- as.matrix(beta.spat.rep14$Btotal)
+beta.spat.rep.Brich <- as.matrix(beta.spat.rep14$Brich)
+beta.spat.rep.Brepl <- as.matrix(beta.spat.rep14$Brepl)
+diag(beta.spat.rep.Btotal) <-NA
+diag(beta.spat.rep.Brich) <-NA
+diag(beta.spat.rep.Brepl) <-NA
+
+# do pairwise for pond
+# total
+dis.site.Btotal =vector()
+for (i in 1:NCOL(beta.spat.rep.Btotal)) {
+  #dis.site.turn[i] <- mean(c(jac.2014.turn[i,], jac.2014.turn[,i]), na.rm=TRUE)
+  dis.site.Btotal[i] <- mean(beta.spat.rep.Btotal[,i], na.rm=TRUE)
+}
+mean(dis.site.Btotal);sd(dis.site.Btotal)
+#mean(beta.temp[,1]);sd(beta.temp[,1])
+#t.test(beta.temp[,1], dis.site.turn)
+
+# richness
+dis.site.Brich =vector()
+for (i in 1:NCOL(beta.spat.rep.Brich)) {
+  #dis.site.nest[i] <- mean(c(jac.2014.nest[i,], jac.2014.nest[,i]), na.rm=TRUE)
+  dis.site.Brich[i] <- mean(beta.spat.rep.Brich[,i], na.rm=TRUE)
+}
+mean(dis.site.Brich);sd(dis.site.Brich)
+#mean(beta.temp[,2]);sd(beta.temp[,2])
+#t.test(beta.temp[,2], dis.site.nest)
+
+# replacement
+dis.site.Brepl =vector()
+for (i in 1:NCOL(beta.spat.rep.Brepl)) {
+  #dis.site.tot[i] <- mean(c(jac.2014.tot[i,], jac.2014.tot[,i]), na.rm=TRUE)
+  dis.site.Brepl[i] <- mean(beta.spat.rep.Brepl[,i], na.rm=TRUE)
+}
+mean(dis.site.Brepl);sd(dis.site.Brepl)
+#mean(beta.temp[,3]);sd(beta.temp[,3])
+#t.test(beta.temp[,3], dis.site.tot)
+
+# time
+beta.time.rep =data.frame(Btotal=NA, Brepl=NA, Brich=NA)
+for (i in 1:nrow(sp14)) {
+beta.time.rep[i,] <- unlist(beta(rbind(sp14[i,-1],sp19[i,-1]), 
+                         func = "jaccard", abund = FALSE))
+}
+colMeans(beta.time.rep)
+mean(beta.temp[,3]) # total
+mean(beta.temp[,1], na.rm=T) #turnover
+mean(beta.temp[,2], na.rm=T) #nested
+
+#___Fig 4 to compare spatial-temporal beta diversity Beselga####
 spa.temp <- data.frame(index = c(dis.site.turn,beta.temp[,1],
                                     dis.site.nest,beta.temp[,2],
                                     dis.site.tot,beta.temp[,3]),
@@ -315,6 +386,29 @@ ggplot(spa.temp, aes(y=index, x=component, fill=Type)) +
         legend.key.width = unit(1.2,"cm")) +
   labs(x="", y="Dissimilarity") +
   scale_fill_manual(values=c("white", "gray66"))
+
+#___Fig 4 to compare spatial-temporal beta diversity repl/rich####
+spa.temp.rep <- data.frame(index = c(dis.site.Brich, beta.time.rep[,3],
+                           dis.site.Brepl, beta.time.rep[,2],
+                           dis.site.Btotal, beta.time.rep[,1]),
+                       component = rep(c("richness", "replacement",
+                                         "total"), each = 60),
+                       Type = rep(c("spatial", "temporal"),3, each = 30))
+spa.temp.rep$component <- relevel(factor(spa.temp.rep$component), ref = "richness")
+
+ggplot(spa.temp.rep, aes(y=index, x=component, fill=Type)) +
+  geom_boxplot() +
+  guides(colour=guide_legend(title=NULL), 
+         fill=guide_legend(title=NULL), 
+         shape="none") +
+  theme_cowplot(12) +
+  theme(#legend.position = c(0.35,0.9), 
+    legend.title=element_blank(),
+    text=element_text(size=18),
+    legend.key.width = unit(1.2,"cm")) +
+  labs(x="", y="Dissimilarity") +
+  scale_fill_manual(values=c("white", "gray66"))
+
 
 # comparing beta diversity between years
 beta2014 <- beta.multi(sp14[,-1], index.family="jaccard")
