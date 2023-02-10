@@ -8,6 +8,10 @@
 #
 ##########################################################
 
+# Note to GG
+#we can use a Procrustes analysis to compare scores 
+#from PCAs based on local environmental data in both years
+
 # load some general packages
 library(gsheet)
 library(cowplot)
@@ -99,9 +103,14 @@ sp14$Lestes.sp. <- Lestes.sp.
 Lestes.sp.  <- apply(cbind(sp19$Lestes.dryas, sp19$Lestes.sp.,sp19$Lestes.sponsa),1, sum)
 Lestes.sp.  <- ifelse(Lestes.sp.> 1,1, Lestes.sp.)
 sp19$Lestes.sp. <- Lestes.sp.
-lestes.remove <- which(colnames(sp14) %in% c("Lestes.dryas", "Lestes.sponsa"))
-sp14 <- sp14[,-lestes.remove]
-sp19 <- sp19[,-lestes.remove]
+
+# Limnephilus ignavus only determind 2019 and should be merged with Limnephilidae
+# but Limnephilidae is already recorede in the pond where Limnephilus ignavus 
+# was observed so we can simply remove the Limnephilus ignavus species
+lestes.limne.remove <- which(colnames(sp14) %in% c("Lestes.dryas", "Lestes.sponsa",
+                                             "Limnephilus.ignavus"))
+sp14 <- sp14[,-lestes.limne.remove]
+sp19 <- sp19[,-lestes.limne.remove]
 sp14 <- sp14[-NArows,]
 sp19 <- sp19[-NArows,]
 
@@ -122,10 +131,11 @@ library(lmerTest)
 # Is there a change in species richness over time?
 var.mod = lmerTest::lmer(sr ~ time + (1|id), sr.dat)
 summary(var.mod) # No. P=0.47
+anova(var.mod)
 
 # Is spatial variation different between the two years
 var.test(sr ~ time, sr.dat, alternative = "two.sided")
-# No. P=0.53
+# No. P=0.54
 
 # check variance components
 var.mod = lmer(sr ~ 1 + (1|id), sr.dat, 
@@ -138,12 +148,12 @@ attributes(VarCorr(var.mod))$sc^2/(VarCorr(var.mod)$id[1] + attributes(VarCorr(v
 
 #__species 2014 and 2019####
 sum(apply(sp14[,-1], 2, sum)>0) # 92 species 2014
-sum(apply(sp19[,-1], 2, sum)>0) # 82 species 2019
+sum(apply(sp19[,-1], 2, sum)>0) # 81 species 2019
 #___overlap
 sp.names.14 <- colnames(sp14[,-1])[apply(sp14[,-1], 2, sum)>0]
 sp.names.19 <- colnames(sp19[,-1])[apply(sp19[,-1], 2, sum)>0]
-sum(!(sp.names.14 %in% sp.names.19)) # 37 species unique in 2014
-sum(!(sp.names.19 %in% sp.names.14)) # 27 species unique in 2019
+sum(!(sp.names.14 %in% sp.names.19)) # 36 species unique in 2014
+sum(!(sp.names.19 %in% sp.names.14)) # 22 species unique in 2019
 sum(!(sp.names.14 %in% sp.names.19)) / sum(apply(sp14[,-1], 2, sum)>0) 
 sum(!(sp.names.19 %in% sp.names.14)) / sum(apply(sp19[,-1], 2, sum)>0) 
 # 40% of the species in 2014 were only found in 2014
@@ -255,7 +265,19 @@ mean(beta.temp[,1], na.rm=T) #turnover
 mean(beta.temp[,2], na.rm=T) #nested
 mean(beta.temp[,3]) # total
 
+
 beta2014 <- beta.multi(sp14[,-1], index.family="jaccard")
+beta2019 <- beta.multi(sp19[,-1], index.family="jaccard")
+
+# comparing beta diversity between years
+# table 1
+beta2014 <- betapart::beta.multi(sp14[,-1], index.family="jaccard")
+beta2019 <- betapart::beta.multi(sp19[,-1], index.family="jaccard")
+cbind(beta2014,beta2019)
+
+# species lost 2014-2019
+betapart.core(rbind(sp14[,-1],sp19[,-1]))
+
 
 # spatial beta diversity
 jac.2014 <- beta.pair(sp14[,-1], index.family="jac")
@@ -387,7 +409,7 @@ ggplot(spa.temp, aes(y=index, x=component, fill=Type)) +
   labs(x="", y="Dissimilarity") +
   scale_fill_manual(values=c("white", "gray66"))
 
-#___Fig 4 to compare spatial-temporal beta diversity repl/rich####
+#____Fig 4 to compare spatial-temporal beta diversity repl/rich####
 spa.temp.rep <- data.frame(index = c(dis.site.Brich, beta.time.rep[,3],
                            dis.site.Brepl, beta.time.rep[,2],
                            dis.site.Btotal, beta.time.rep[,1]),
@@ -408,15 +430,6 @@ ggplot(spa.temp.rep, aes(y=index, x=component, fill=Type)) +
     legend.key.width = unit(1.2,"cm")) +
   labs(x="", y="Dissimilarity") +
   scale_fill_manual(values=c("white", "gray66"))
-
-
-# comparing beta diversity between years
-beta2014 <- beta.multi(sp14[,-1], index.family="jaccard")
-beta2019 <- beta.multi(sp19[,-1], index.family="jaccard")
-cbind(beta2014,beta2019)
-
-# species lost 2014-2019
-betapart.core(rbind(sp14[,-1],sp19[,-1]))
 
 
 # Spatial autocorrelation ####
@@ -444,7 +457,7 @@ Moran.I(cent.sf.sub$tbi, spa.dists.inv)
 Moran.I(tbi.sp$BCD.mat[,1], spa.dists.inv)
 Moran.I(tbi.sp$BCD.mat[,2], spa.dists.inv)
 Moran.I(sp.change, spa.dists.inv)
-# No evidence.
+# Little evidence.
 
 # check residuals
 Moran.I(resid(lm(tbi.sp ~ tbi.env + tbi.lc + log(area), sem.dat)), 
@@ -531,6 +544,7 @@ ggiNEXT(out.raw, type=1, color.var="Assemblage") +
 
 # Fix data frame and add labels etc
 plot.dat <- fortify(out.raw, type=1)
+plot.dat = plot.dat[1:110,] # remove merged category
 plot.dat$Time <- c(rep(c("2014", "2019"),
                         each=40),rep("Both", 30))
 data.sub <- plot.dat[which(plot.dat$Method=="Observed"),]
@@ -587,6 +601,27 @@ imp.c = landuse.sub$imp.2015 - landuse.sub$imp.2018
 grass.c = landuse.sub$grass.2015 - landuse.sub$grass.2018
 mean(imp.c); range(imp.c)
 mean(grass.c); range(grass.c)
+
+change.env <- env14[,-1] - env19[,-1]
+change.env$Grassland_percent <- grass.c
+change.env$Impoverished_percent <- imp.c
+#change.env$TBI_environment <-  tbi.env$TBI
+
+pdf("figS1.pdf",width=7, height=9.4 )
+
+par(mfrow = c(4, 3))
+for (i in 1:NCOL(change.env)) {
+  xlab = colnames(change.env)[i]
+  #hists[[i]] <- 
+    hist(change.env[,i], xlab = xlab, main="")
+    lab = paste(letters[i], ")", sep="")
+    mtext(lab, side=3, line= -1, adj = 0.1, cex=1)
+  #ggplot(change.env, aes_string(x=)) + geom_histogram()
+  
+}
+dev.off()
+
+
 #____test time effect with mvabund####
 sp.mat <- as.data.frame(sp.mat.dat[,-1])
 abu <- mvabund(sp.mat)
@@ -655,7 +690,9 @@ for (i in 1:length(sp.names)) {
 res
 
 # Check species
+# lost from ponds
 res[which(res$ext.ebcom==1),]
+
 res[which(res$'01'==0),]
 res[which(res$odd>1.01),]
 res[which(res$ext.ebcom==1),]
@@ -663,26 +700,31 @@ plot(res$'00', res$odd)
 
 # 3 species with low extinction but still rare
 res[which(res$ext.ebcom<0.5 & res$ps < 0.3),]
+res$shape <- "rest"
+res$shape[which(res$ext.ebcom<0.5 & res$ps < 0.3)] <- "focus"
 
-colo = ggplot(res, aes(x=ps, y=col.ebcom, color=names))+
+colo = ggplot(res, aes(x=ps, y=col.ebcom, shape=color))+
   geom_abline(slope=1, linetype = "dashed") +
-  geom_point(legend=FALSE) +
+  geom_point(legend=FALSE, size=2.5) +
   #lims(y=c(0,1), x=c(0,1)) +
   labs(y="Local colonization probability")+
   theme_cowplot() +
   theme(plot.margin=unit(c(1,1,0,2),'lines')) +
-  guides(colour="none") + 
+  guides(shape="none") + 
+  scale_shape_manual(values = c(19,21)) +
   scale_x_continuous(expand = c(0, 0), limits = c(0,1),
                      breaks=seq(0,1,0.1)) + 
   scale_y_continuous(expand = c(0, 0), limits = c(0, 1.1),
                      breaks=seq(0,1,0.1))
-ext = ggplot(res, aes(x=ps, y=ext.ebcom, color=names))+
-  geom_point() +
+colo
+ext = ggplot(res, aes(x=ps, y=ext.ebcom, shape=color))+
+  geom_point(size=2.5) +
   geom_abline(slope=-1, intercept=1, linetype="dashed")+
   labs(y="Local extinction probability")+
   theme_cowplot() +
   theme(plot.margin=unit(c(1,1,0,2),'lines')) +
-  guides(colour="none") + 
+  guides(shape="none") + 
+  scale_shape_manual(values = c(19,21)) +
   scale_x_continuous(expand = c(0, 0), limits = c(0,1),
                      breaks=seq(0,1,0.1)) + 
   scale_y_continuous(expand = c(0, 0), limits = c(0, 1.1),
