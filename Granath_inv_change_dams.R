@@ -6,7 +6,7 @@
 #
 # Contact: Gustaf.Granath@gmail.com
 # 
-#########################################################
+##########################################################
 
 # load some general packages
 library(gsheet)
