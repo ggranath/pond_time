@@ -8,10 +8,6 @@
 #
 ##########################################################
 
-# Note to GG
-#we can use a Procrustes analysis to compare scores 
-#from PCAs based on local environmental data in both years
-
 # load some general packages
 library(gsheet)
 library(cowplot)
@@ -757,3 +753,8 @@ probExtinction = function(prob, oratio=1) {
     (1 / (2 * (oratio[!index1] - 1) * prob[!index1]))
   ans
 }
+
+# NOTES ####
+# Note to GG
+#we can use a Procrustes analysis to compare scores 
+#from PCAs based on local environmental data in both years
