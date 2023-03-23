@@ -1,4 +1,4 @@
-##########################################################
+###########################################################
 # Disentangling drivers of temporal 
 # change of macroinvertebrate diversity in urban ponds
 #
@@ -6,7 +6,7 @@
 #
 # Contact: Gustaf.Granath@gmail.com
 # 
-##########################################################
+###########################################################
 
 # load some general packages
 library(gsheet)
