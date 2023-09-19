@@ -86,11 +86,27 @@ pairs(env19[,2:NCOL(env19)]) # no large collinearity
 
 landuse.sub <- landuse[-NArows,]
 
+# get family name
+library(taxize)
+name14 <- colnames(sp14)
+name14 <- gsub(".", " ", name14, fixed=TRUE)
+name14 <- gsub(" sp ", "", name14, fixed=TRUE)
+
+all_names14 <- tax_name(name14[-1][1:60], get = 'family', db = 'ncbi')
+
+all_names14b <- tax_name(name14[-1][61:120], get = 'family', db = 'ncbi')
+
+all_names14c <- tax_name(name14[-1][121:154], get = 'family', db = 'ncbi')
+
+all_names14.full <- c(all_names14$family, all_names14b$family, 
+                      all_names14c$family)
+write.csv(all_names14.full, "fam.csv")
+
 
 # Species richness analyses ####
 url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=2141698541'
-sp14 <- read.csv(construct_download_url(url), skip=1, nrows = 35)
-sp19 <- read.csv(construct_download_url(url), skip=39)
+sp14 <- read.csv(construct_download_url(url), skip=2, nrows = 35)
+sp19 <- read.csv(construct_download_url(url), skip=40)
 # lestes sp recorded 2014 but other species increases 2019 and 
 # lestes sp is zero in 2019. So we merge to one species.
 Lestes.sp.  <- apply(cbind(sp14$Lestes.dryas, sp14$Lestes.sp.,sp14$Lestes.sponsa),1, sum)
@@ -101,7 +117,7 @@ Lestes.sp.  <- ifelse(Lestes.sp.> 1,1, Lestes.sp.)
 sp19$Lestes.sp. <- Lestes.sp.
 
 # Limnephilus ignavus only determind 2019 and should be merged with Limnephilidae
-# but Limnephilidae is already recorede in the pond where Limnephilus ignavus 
+# but Limnephilidae is already recorded in the pond where Limnephilus ignavus 
 # was observed so we can simply remove the Limnephilus ignavus species
 lestes.limne.remove <- which(colnames(sp14) %in% c("Lestes.dryas", "Lestes.sponsa",
                                              "Limnephilus.ignavus"))
@@ -114,18 +130,37 @@ no.species <- which(colSums(rbind(sp14[,-1],sp19[,-1]))==0)
 sp14 <- sp14[,-(no.species+1)] # +1 to add first column with pond names
 sp19 <- sp19[,-(no.species+1)] # +1 to add first column with pond names
 
+# remove family level "species"
+sp14.nofam = sp14[,-grep("dae",colnames(sp14))]
+sp19.nofam = sp19[,-grep("dae",colnames(sp19))]
+# remove not resolved taxa
+sp14.nounk = sp14.nofam[,-grep("sp.",colnames(sp14.nofam))]
+sp19.nounk = sp19.nofam[,-grep("sp.",colnames(sp19.nofam))]
+#
+
 sr.14 <- rowSums(sp14[,-1])
 sr.19 <- rowSums(sp19[,-1])
 sr.dat <- data.frame(sr = c(sr.14,sr.19), id=factor(rep(sp14$Name,2)), 
                      time =factor(rep(c("1","2"),each=length(sr.14))))
 mean(sr.14); sd(sr.14) # 10.3 species, sd 4.8
-mean(sr.19); sd(sr.19) # 11.0 species, sd=5.4
+mean(sr.19); sd(sr.19) # 11.0 species, sd=5.3
+
+# species numbers without family level
+sr.14.nofam <- rowSums(sp14.nounk[,-1])
+sr.19.nofam <- rowSums(sp19.nounk[,-1])
+sr.dat.nofam <- data.frame(sr = c(sr.14.nofam,sr.19.nofam), 
+                           id=factor(rep(sp14.nofam$Name,2)), 
+                     time =factor(rep(c("1","2"),each=length(sr.14.nofam))))
+mean(sr.14.nofam); sd(sr.14.nofam) # 9.2 species, sd 4.3
+mean(sr.19.nofam); sd(sr.19.nofam) # 9.1 species, sd=4.8
+
 
 #__test differences and variation in species richness####
 library(lme4)
 library(lmerTest)
 # Is there a change in species richness over time?
-var.mod = lmerTest::lmer(sr ~ time + (1|id), sr.dat)
+var.mod = lmerTest::lmer(sr ~ time + (1|id), sr.dat) 
+# use data = sr.dat.nofam for no family, even less difference
 summary(var.mod) # No. P=0.47
 anova(var.mod)
 
@@ -143,17 +178,23 @@ attributes(VarCorr(var.mod))$sc^2/(VarCorr(var.mod)$id[1] + attributes(VarCorr(v
 
 
 #__species 2014 and 2019####
-sum(apply(sp14[,-1], 2, sum)>0) # 92 species 2014
-sum(apply(sp19[,-1], 2, sum)>0) # 81 species 2019
+sum(apply(sp14.nounk[,-1], 2, sum)>0) # 92 species 2014
+sum(apply(sp19.nounk[,-1], 2, sum)>0) # 81 species 2019
+# without family level: 85 and 76
+# aslo without sp., 69 and 60
+
 #___overlap
+# use *.nofam to test without family level
 sp.names.14 <- colnames(sp14[,-1])[apply(sp14[,-1], 2, sum)>0]
 sp.names.19 <- colnames(sp19[,-1])[apply(sp19[,-1], 2, sum)>0]
 sum(!(sp.names.14 %in% sp.names.19)) # 36 species unique in 2014
 sum(!(sp.names.19 %in% sp.names.14)) # 22 species unique in 2019
 sum(!(sp.names.14 %in% sp.names.19)) / sum(apply(sp14[,-1], 2, sum)>0) 
 sum(!(sp.names.19 %in% sp.names.14)) / sum(apply(sp19[,-1], 2, sum)>0) 
-# 40% of the species in 2014 were only found in 2014
-# 33% of the species in 2019 were only found in 2019
+# 39% of the species in 2014 were only found in 2014
+# 31% of the species in 2019 were only found in 2019
+# 37% and 31% if without family level
+# 33% and 26% without family and sp
 
 # How many determined to species level?
 all.names = c(sp.names.14[which(!(sp.names.14 %in% sp.names.19))], sp.names.19)
@@ -245,30 +286,35 @@ plot(landuse.sub$grass.2015- landuse.sub$grass.2018, tbi.env[[1]])
 plot(landuse.sub$imp.2015- landuse.sub$imp.2018, tbi.env[[1]])
 
 #___TBI - beta div ####
-pond.sp.change = env.dat.fix(sp14[,-1], sp19[,-1])
-tbi.sp = TBI(sp14[,-1], sp19[,-1], method="jaccard", nperm=9999, test.t.perm=TRUE)
-tbi.sp # no difference in species loss or gain over time (41% losses, 44% gain)
+pond.sp.change = env.dat.fix(sp14.nounk[,-1], sp19.nounk[,-1])
+tbi.sp = TBI(sp14.nounk[,-1], sp19.nounk[,-1], method="jaccard", nperm=9999, test.t.perm=TRUE)
+tbi.sp # no difference in species loss or gain over time (41% losses, 44% gain,
+# and 48% and 52% of dissimilarity coefficient)
+# Without family level: 43% and 42%, and 51% and 49 of dissim coef
+# Without family and sp: 48% and 37%, and 56% and 44%
+
 tbi.sp$p.TBI[tbi.sp$p.TBI<0.05] # barely below 0.05
 tbi.sp$TBI[]
 hist(tbi.sp$TBI)
 # no sites are statistically very different
+# same for without family level and sp
 
 # Temporal versus spatial beta diversity####
 # turnover, nested and total temporal beta diversity
 library(betapart)
-beta.temp <- beta.temp(sp14[,-1], sp19[,-1], index.family="jaccard")
+beta.temp <- beta.temp(sp14.nounk[,-1], sp19.nounk[,-1], index.family="jaccard")
 mean(beta.temp[,1], na.rm=T) #turnover
 mean(beta.temp[,2], na.rm=T) #nested
 mean(beta.temp[,3]) # total
 
 
-beta2014 <- beta.multi(sp14[,-1], index.family="jaccard")
-beta2019 <- beta.multi(sp19[,-1], index.family="jaccard")
+beta2014 <- beta.multi(sp14.nounk[,-1], index.family="jaccard")
+beta2019 <- beta.multi(sp19.nounk[,-1], index.family="jaccard")
 
 # comparing beta diversity between years
 # table 1
-beta2014 <- betapart::beta.multi(sp14[,-1], index.family="jaccard")
-beta2019 <- betapart::beta.multi(sp19[,-1], index.family="jaccard")
+beta2014 <- betapart::beta.multi(sp14.nounk[,-1], index.family="jaccard")
+beta2019 <- betapart::beta.multi(sp19.nounk[,-1], index.family="jaccard")
 cbind(beta2014,beta2019)
 
 # species lost 2014-2019
@@ -319,8 +365,8 @@ t.test(beta.temp[,3], dis.site.tot)
 #____Test for replacement and loss/gain####
 library(BAT)
 # Spatial
-beta.spat.rep14 <- beta(sp14[,-1], func = "jaccard", abund = FALSE)
-beta.spat.rep19 <- beta(sp19[,-1], func = "jaccard", abund = FALSE)
+beta.spat.rep14 <- beta(sp14.nounk[,-1], func = "jaccard", abund = FALSE)
+beta.spat.rep19 <- beta(sp19.nounk[,-1], func = "jaccard", abund = FALSE)
 
 # year the same here as well, so go with 2014
 mean(beta.spat.rep14$Btotal)
@@ -375,7 +421,7 @@ mean(dis.site.Brepl);sd(dis.site.Brepl)
 # time
 beta.time.rep =data.frame(Btotal=NA, Brepl=NA, Brich=NA)
 for (i in 1:nrow(sp14)) {
-beta.time.rep[i,] <- unlist(beta(rbind(sp14[i,-1],sp19[i,-1]), 
+beta.time.rep[i,] <- unlist(beta(rbind(sp14.nounk[i,-1],sp19.nounk[i,-1]), 
                          func = "jaccard", abund = FALSE))
 }
 colMeans(beta.time.rep)
@@ -466,8 +512,8 @@ Moran.I(resid(lm(sp.change ~ sr.14 + tbi.env + tbi.lc + log(area), sem.dat)),
 # SEMs####
 #___species richness####
 library(piecewiseSEM)
-sp.change <- sr.14 - sr.19
-sem.dat <- data.frame(sp.change = sp.change, sr.14 = sr.14, sr.19 = sr.19,
+sp.change <- sr.14.nofam - sr.19.nofam
+sem.dat <- data.frame(sp.change = sp.change, sr.14 = sr.14.nofam, sr.19 = sr.19.nofam,
                       tbi.sp = tbi.sp$TBI, area=area[,2],
                       tbi.lc = tbi.lc$TBI, tbi.env = tbi.env$TBI,
                       imp = landuse.sub$imp.2015- landuse.sub$imp.2018,
@@ -481,6 +527,8 @@ write.table(summary(model.sr, .progressBar = F)$coefficients, "sem_sr.txt")
 
 plot(model.sr, show="std",add_edge_label_spaces=TRUE)  
 coefs(model.sr, standardize = "scale")
+# without family and sp, land cover and env variables have
+# less effect 
 
 #___temporal beta####
 # total
@@ -514,9 +562,9 @@ coefs(model.tempbeta, standardize = "scale")
 
 #Rarefaction curves####
 # Rarefaction is done with the iNEXT package 
-sp.mat.dat <- rbind(sp14,sp19) 
+sp.mat.dat <- rbind(sp14.nounk, sp19.nounk) 
 time =factor(rep(c("2014","2019"),each=nrow(sp14)))
-sp.mer <- sp14[,-1] + sp19[,-1]
+sp.mer <- sp14.nounk[,-1] + sp19.nounk[,-1]
 sp.mer[sp.mer>1] <- 1
 
 #____Rarefaction curves. Fig 2####
@@ -576,7 +624,7 @@ library(mvabund)
 library(permute)
 
 #___mvabund####
-sp.mat.dat <- rbind(sp14,sp19) 
+sp.mat.dat <- rbind(sp14.nounk, sp19.nounk) 
 
 # We focus on more common species here so
 # we remove species that occurred only 5 times (or less) across years 
@@ -642,8 +690,8 @@ rownames(sum.ad$uni.p)[which(sum.ad$uni.p[,2]<0.05)]
 #Species colon-extinc prob####
 #__VGAM####
 library(VGAM)
-sp.mat.dat.14 <- sp14[, -1]
-sp.mat.dat.19 <- sp19[,-1]
+sp.mat.dat.14 <- sp14.nounk[, -1]
+sp.mat.dat.19 <- sp19.nounk[,-1]
 
 rare <- which(apply(rbind(sp.mat.dat.14,sp.mat.dat.19), 2, sum) < 6)
 sp.mat.dat.14 <- sp.mat.dat.14[,-c(rare)]
@@ -699,7 +747,7 @@ res[which(res$ext.ebcom<0.5 & res$ps < 0.3),]
 res$shape <- "rest"
 res$shape[which(res$ext.ebcom<0.5 & res$ps < 0.3)] <- "focus"
 
-colo = ggplot(res, aes(x=ps, y=col.ebcom, shape=color))+
+colo = ggplot(res, aes(x=ps, y=col.ebcom, shape=shape))+
   geom_abline(slope=1, linetype = "dashed") +
   geom_point(legend=FALSE, size=2.5) +
   #lims(y=c(0,1), x=c(0,1)) +
@@ -713,7 +761,7 @@ colo = ggplot(res, aes(x=ps, y=col.ebcom, shape=color))+
   scale_y_continuous(expand = c(0, 0), limits = c(0, 1.1),
                      breaks=seq(0,1,0.1))
 colo
-ext = ggplot(res, aes(x=ps, y=ext.ebcom, shape=color))+
+ext = ggplot(res, aes(x=ps, y=ext.ebcom, shape=shape))+
   geom_point(size=2.5) +
   geom_abline(slope=-1, intercept=1, linetype="dashed")+
   labs(y="Local extinction probability")+
