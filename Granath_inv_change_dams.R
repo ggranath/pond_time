@@ -3,9 +3,9 @@
 # change of macroinvertebrate diversity in urban ponds
 #
 # Granath et al. 
+# Journal: Urban Ecosystems
 #
 # Contact: Gustaf.Granath@gmail.com
-# 
 ###########################################################
 
 # load some general packages
@@ -20,13 +20,15 @@ library(terra)
 library(sf)
 
 # read raster layers 
+# these files need to be downloaded from
+# https://land.copernicus.eu/en/products
 grass.rast <- rast("GRAC_1518_020m_E47N40_03035_v010.tif")
 forest.rast <- rast("TCCM_1518_020m_E47N40_03035_v010.tif")
 imp.rast <- rast("IMCC_1518_020m_E47N40_03035_v010.tif")
 
 # load pond locations and transform to same projection
-url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=1833472143'
-cent.raw <- as.data.frame(gsheet2tbl(url))
+cent.raw <- read.csv("Granath_etal_2023_ponds_datacoord.csv", sep=",")
+
 cent = st_as_sf(cent.raw, coords = c("Longitude","Latitude"), remove = FALSE,
                 crs= 4326)
 cent = st_transform(cent, crs=3035)
@@ -71,10 +73,10 @@ landuse = data.frame(site = cent$Name, grass.2015 = d.grass$class10 + d.grass$cl
                      imp.2018 = d.imp$class10 + d.imp$class1)
 
 # Load pond environmental data ###
-url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=484274396'
-env14 <- as.data.frame(gsheet2tbl(url))
-url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=68965734'
-env19 <- as.data.frame(gsheet2tbl(url))
+env14 <- read.csv("Granath_etal_2023_ponds_dataEnv2014.csv", 
+                   sep=",", check.names=FALSE)
+env19 <- read.csv("Granath_etal_2023_ponds_dataEnv2019.csv",
+                   sep=",", check.names=FALSE)
 not_samp <- which(env19[,1] %in% "Ängsholmsdammen") 
 NArows <- c(which(apply(env19,1, function (x) anyNA(x))), not_samp)
 
@@ -86,27 +88,10 @@ pairs(env19[,2:NCOL(env19)]) # no large collinearity
 
 landuse.sub <- landuse[-NArows,]
 
-# get family name
-library(taxize)
-name14 <- colnames(sp14)
-name14 <- gsub(".", " ", name14, fixed=TRUE)
-name14 <- gsub(" sp ", "", name14, fixed=TRUE)
-
-all_names14 <- tax_name(name14[-1][1:60], get = 'family', db = 'ncbi')
-
-all_names14b <- tax_name(name14[-1][61:120], get = 'family', db = 'ncbi')
-
-all_names14c <- tax_name(name14[-1][121:154], get = 'family', db = 'ncbi')
-
-all_names14.full <- c(all_names14$family, all_names14b$family, 
-                      all_names14c$family)
-write.csv(all_names14.full, "fam.csv")
-
-
 # Species richness analyses ####
-url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=2141698541'
-sp14 <- read.csv(construct_download_url(url), skip=2, nrows = 35)
-sp19 <- read.csv(construct_download_url(url), skip=40)
+sp14 <- read.csv("Granath_etal_2023_ponds_dataRichness2014_19.csv", skip=2, nrows = 35)
+sp19 <- read.csv("Granath_etal_2023_ponds_dataRichness2014_19.csv", skip=40)
+
 # lestes sp recorded 2014 but other species increases 2019 and 
 # lestes sp is zero in 2019. So we merge to one species.
 Lestes.sp.  <- apply(cbind(sp14$Lestes.dryas, sp14$Lestes.sp.,sp14$Lestes.sponsa),1, sum)
@@ -248,9 +233,9 @@ ggplot(plot.sites.found.twice[rev(order(plot.sites.found.twice$sites))[1:10],],
   labs(x ="", y="Number of sites")
 
 # Pond area data ####
-url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=1881497525'
-area <- as.data.frame(gsheet2tbl(url))
-area <- area[-NArows,1:2]
+area <- read.csv("Granath_etal_2023_ponds_dataArea.csv", sep=",",
+ check.names=FALSE)
+area <- area2[-NArows,]
 summary(lm(sr.14 ~ area[,2])) # no effect of dam area on species richness
 
 # Temporal beta diversity (TBI) analyses####
@@ -689,6 +674,7 @@ rownames(sum.ad$uni.p)[which(sum.ad$uni.p[,2]<0.05)]
 
 #Species colon-extinc prob####
 #__VGAM####
+# First load the probColonization function (see section below)
 library(VGAM)
 sp.mat.dat.14 <- sp14.nounk[, -1]
 sp.mat.dat.19 <- sp19.nounk[,-1]
@@ -802,7 +788,23 @@ probExtinction = function(prob, oratio=1) {
   ans
 }
 
-# NOTES ####
-# Note to GG
-#we can use a Procrustes analysis to compare scores 
-#from PCAs based on local environmental data in both years
+#delete
+url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=1833472143'
+cent.raw2 <- as.data.frame(gsheet2tbl(url))
+
+url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=484274396'
+env14 <- as.data.frame(gsheet2tbl(url))
+url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=68965734'
+env19 <- as.data.frame(gsheet2tbl(url))
+
+url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=2141698541'
+sp14 <- read.csv(construct_download_url(url), skip=2, nrows = 35)
+sp19 <- read.csv(construct_download_url(url), skip=40)
+
+url <- 'https://docs.google.com/spreadsheets/d/1FqxnVY_nmfik9BAO45-RvYVXzM4CtFSK/edit#gid=1881497525'
+area <- as.data.frame(gsheet2tbl(url))
+area <- area[-NArows,1:2]
+
+
+
+
